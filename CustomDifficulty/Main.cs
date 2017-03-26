@@ -233,7 +233,7 @@ namespace Koishi
 		}
 	}
 	public class Config
-	{
+	{	
 		public int ItemDropAmount = 2;
 		public int EquipDropAmount = 1;
 		public int RandomDropRate = 10;
