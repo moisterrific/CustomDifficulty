@@ -7,6 +7,7 @@ using Terraria.DataStructures;
 using System.Collections.Generic;
 using System.Linq;
 using TShockAPI;
+using System.Text;
 
 namespace Koishi
 {
@@ -64,6 +65,7 @@ namespace Koishi
 				int direction = args.Msg.reader.ReadByte() - 1;
 				bool pvp = ((BitsByte)args.Msg.reader.ReadByte())[0];
 				var p = Main.player[playerID];
+				StringBuilder notice = new StringBuilder();
 				switch (config.UseDropWay)
 				{
 					case 1:
@@ -99,6 +101,7 @@ namespace Koishi
 									}
 									if (DropAll || DropSeq.Contains(inventortIndex))
 									{
+										notice.Append(TShock.Utils.ItemTag(p.inventory[i]));
 										if (config.Vanish)
 										{
 											p.inventory[i].SetDefaults(0);
@@ -145,6 +148,7 @@ namespace Koishi
 									}
 									if (DropAll || DropSeq.Contains(armorIndex))
 									{
+										notice.Append(TShock.Utils.ItemTag(p.armor[i]));
 										if (config.Vanish)
 										{
 											p.armor[i].SetDefaults(0);
@@ -175,6 +179,7 @@ namespace Koishi
 								{
 									if (config.Vanish)
 									{
+										notice.Append(TShock.Utils.ItemTag(p.inventory[i]));
 										p.inventory[i].SetDefaults(0);
 										NetMessage.SendData(5, -1, -1, p.inventory[i].name, playerID, i, p.inventory[i].prefix);
 									}
@@ -197,6 +202,7 @@ namespace Koishi
 								{
 									if (config.Vanish)
 									{
+										notice.Append(TShock.Utils.ItemTag(p.armor[i]));
 										p.armor[i].SetDefaults(0);
 										NetMessage.SendData(5, -1, -1, p.armor[i].name, playerID, i + 59, p.armor[i].prefix);
 									}
@@ -210,6 +216,11 @@ namespace Koishi
 							}
 							break;
 						}
+				}
+				if (notice.Length >= 3)
+				{
+					notice.Append(" was dropped from your inventory!");
+					NetMessage.SendData(25, playerID, -1, notice.ToString());
 				}
 				Main.player[playerID].KillMe(reason, damage, direction, pvp);
 				if (Main.netMode == 2)
