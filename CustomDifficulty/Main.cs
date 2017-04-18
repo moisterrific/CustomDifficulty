@@ -19,7 +19,7 @@ namespace Koishi
 		public override string Author => "Gyrodrill";
 		public override string Description => "Customize difficulty for SSC players, like random drop x items when killed.";
 		public override string Name => "CustomDifficulty";
-		public override Version Version => new Version(1, 1);
+		public override Version Version => new Version(1, 2);
 		public CDMain(Main game) : base(game)
 		{
 		}
@@ -57,7 +57,6 @@ namespace Koishi
 		{
 			if (args.MsgID == PacketTypes.PlayerDeathV2)
 			{
-				args.Handled = true;
 				args.Msg.reader.BaseStream.Position = args.Index;
 				int playerID = args.Msg.whoAmI;
 				PlayerDeathReason reason = PlayerDeathReason.FromReader(args.Msg.reader);
@@ -65,6 +64,11 @@ namespace Koishi
 				int direction = args.Msg.reader.ReadByte() - 1;
 				bool pvp = ((BitsByte)args.Msg.reader.ReadByte())[0];
 				var p = Main.player[playerID];
+				if (p.difficulty != 0)
+				{
+					return;
+				}
+				args.Handled = true;
 				StringBuilder notice = new StringBuilder();
 				switch (config.UseDropWay)
 				{
