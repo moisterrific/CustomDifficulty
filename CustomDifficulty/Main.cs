@@ -21,7 +21,8 @@ namespace Koishi
 		public override string Author => "Gyrodrill";
 		public override string Description => "Customize difficulty for SSC players, like random drop x items when killed.";
 		public override string Name => "CustomDifficulty";
-		public override Version Version => new Version(1, 3);
+		//As fast as firefox!
+		public override Version Version => new Version(1, 4);
 		public CDMain(Main game) : base(game)
 		{
 		}
@@ -59,6 +60,10 @@ namespace Koishi
 		}
 		public static T[] GetRandomInArray<T>(int Count, T[] Seq)
 		{
+			if (Seq.Length <= Count)
+			{
+				return Seq;
+			}
 			int end = Seq.Length;
 			T[] ret = new T[Count];
 			for (int i = 0; i < Count; i++)
@@ -78,31 +83,28 @@ namespace Koishi
 				args.Msg.reader.BaseStream.Position = args.Index;
 				int playerID = args.Msg.whoAmI;
 				var p = Main.player[playerID];
-				if (p.difficulty != 0)
+				if (p.difficulty != 0 || !TShock.ServerSideCharacterConfig.Enabled)
 				{
 					return;
 				}
-
 				StringBuilder notice = new StringBuilder();
 				switch (config.UseDropWay)
 				{
 					case 1:
 						{
-							Drop1AndAppendNotice(p, playerID, p.inventory, config.ItemDropAmount, notice, 0);
-							Drop1AndAppendNotice(p, playerID, p.armor, config.EquipDropAmount, notice, 58);
-							Drop1AndAppendNotice(p, playerID, p.miscEquips, config.MiscDropAmount, notice, 88);
+							Drop1AndAppendNotice(Main.player[playerID], Main.player[playerID].inventory, config.ItemDropAmount, notice, 0);
+							Drop1AndAppendNotice(Main.player[playerID], Main.player[playerID].armor, config.EquipDropAmount, notice, 59);
+							Drop1AndAppendNotice(Main.player[playerID], Main.player[playerID].miscEquips, config.MiscDropAmount, notice, 89);
 							break;
 						}
-
 					case 2:
 						{
-							Drop2AndAppendNotice(p, playerID, p.inventory, config.ItemDropAmount, notice, 0);
-							Drop2AndAppendNotice(p, playerID, p.armor, config.EquipDropAmount, notice, 58);
-							Drop2AndAppendNotice(p, playerID, p.miscEquips, config.MiscDropAmount, notice, 88);
+							Drop2AndAppendNotice(Main.player[playerID], Main.player[playerID].inventory, config.ItemDropAmount, notice, 0);
+							Drop2AndAppendNotice(Main.player[playerID], Main.player[playerID].armor, config.EquipDropAmount, notice, 59);
+							Drop2AndAppendNotice(Main.player[playerID], Main.player[playerID].miscEquips, config.MiscDropAmount, notice, 89);
 							break;
 						}
 				}
-
 				if (notice.Length >= 3)
 				{
 					notice.Append(" was dropped from your inventory!");
@@ -110,38 +112,52 @@ namespace Koishi
 				}
 			}
 		}
-		public void Drop1AndAppendNotice(Player p, int playerID, Item[] inv, int count, StringBuilder notice, int os)
+		public void Drop1AndAppendNotice(Player p, Item[] inv, int count, StringBuilder notice, int os)
 		{
 			var invs = inv.Where(item => item.active && item.stack != 0 && item.type != 0);
-			var DropSeq = GetRandomInArray(config.ItemDropAmount, invs.ToArray()).ToList();
+			var amount = 0;
+			switch (os)
+			{
+				case 0:
+					amount = config.ItemDropAmount;
+					break;
+				case 59:
+					amount = config.EquipDropAmount;
+					break;
+				default:
+					amount = config.MiscDropAmount;
+					break;
+			}
+			var DropSeq = GetRandomInArray(amount, invs.ToArray()).ToList();
 			var pil = inv.ToList();
 			while (DropSeq.Any())
 			{
 				var d = pil.IndexOf(DropSeq[0]);
 				notice.Append(TShock.Utils.ItemTag(inv[d]));
-				DropItem(p, playerID, pil[d], os + d);
+				DropItem(p, pil[d], os + d);
 				DropSeq.RemoveAt(0);
 			}
 		}
-		public void Drop2AndAppendNotice(Player p, int playerID, Item[] inv, int rate, StringBuilder notice, int os)
+		public void Drop2AndAppendNotice(Player p, Item[] inv, int rate, StringBuilder notice, int os)
 		{
 			for (int i = 0; i < inv.Length; i++)
 			{
 				if (Main.rand.Next(100) < config.RandomDropRate)
 				{
 					notice.Append(TShock.Utils.ItemTag(inv[i]));
-					DropItem(p, playerID, inv[i], os + i);
+					DropItem(p, inv[i], os + i);
 				}
 			}
 		}
-		public void DropItem(Player p, int playerID, Item i, int itemID)
+		public void DropItem(Player p, Item i, int itemID)
 		{
 			if (!config.Vanish)
 			{
 				Item.NewItem(p.position, i.width, i.height, i.type, i.stack);
 			}
-			i.TurnToAir();
-			NetMessage.SendData(5, -1, -1, null, playerID, itemID, i.prefix);
+			i.stack = i.type = i.netID = 0;
+			i.active = false;
+			NetMessage.SendData(5, -1, -1, null, p.whoAmI, itemID, i.prefix);
 		}
 		public static void ReadConfig<ConfigType>(string path, ConfigType defaultConfig, ref ConfigType config)
 		{
