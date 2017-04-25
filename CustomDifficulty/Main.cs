@@ -113,13 +113,14 @@ namespace Koishi
 		public void Drop1AndAppendNotice(Player p, int playerID, Item[] inv, int count, StringBuilder notice, int os)
 		{
 			var invs = inv.Where(item => item.active && item.stack != 0 && item.type != 0);
-			var DropSeq = GetRandomInArray(config.ItemDropAmount, invs.ToArray());
+			var DropSeq = GetRandomInArray(config.ItemDropAmount, invs.ToArray()).ToList();
 			var pil = inv.ToList();
 			while (DropSeq.Any())
 			{
 				var d = pil.IndexOf(DropSeq[0]);
 				notice.Append(TShock.Utils.ItemTag(inv[d]));
 				DropItem(p, playerID, pil[d], os + d);
+				DropSeq.RemoveAt(0);
 			}
 		}
 		public void Drop2AndAppendNotice(Player p, int playerID, Item[] inv, int rate, StringBuilder notice, int os)
