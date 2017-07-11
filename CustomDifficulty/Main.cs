@@ -153,7 +153,7 @@ namespace Koishi
 		{
 			if (!config.Vanish)
 			{
-				Item.NewItem(p.position, i.width, i.height, i.type, i.stack);
+				var id = Item.NewItem(p.position, i.width, i.height, i.type, i.stack, true, i.prefix, true);
 			}
 			i.stack = i.type = i.netID = 0;
 			i.active = false;
