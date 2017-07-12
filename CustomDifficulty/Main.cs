@@ -154,6 +154,7 @@ namespace Koishi
 			if (!config.Vanish)
 			{
 				var id = Item.NewItem(p.position, i.width, i.height, i.type, i.stack, true, i.prefix, true);
+				Main.item[id].owner = TShock.Utils.FindPlayer(p.name)[0].Index;
 			}
 			i.stack = i.type = i.netID = 0;
 			i.active = false;
