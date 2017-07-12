@@ -1,0 +1,5 @@
+D:\Downloads\Compressed\Source Code\CustomDifficulty\CustomDifficulty\bin\Release\CustomDifficulty.dll
+D:\Downloads\Compressed\Source Code\CustomDifficulty\CustomDifficulty\bin\Release\CustomDifficulty.pdb
+D:\Downloads\Compressed\Source Code\CustomDifficulty\CustomDifficulty\obj\Release\CustomDifficulty.csprojResolveAssemblyReference.cache
+D:\Downloads\Compressed\Source Code\CustomDifficulty\CustomDifficulty\obj\Release\CustomDifficulty.dll
+D:\Downloads\Compressed\Source Code\CustomDifficulty\CustomDifficulty\obj\Release\CustomDifficulty.pdb
