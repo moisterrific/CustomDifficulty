@@ -10,13 +10,18 @@ using TShockAPI;
 using System.Text;
 using Microsoft.Xna.Framework;
 using Terraria.Localization;
+using System.Data;
+using MySql.Data.MySqlClient;
+using Mono.Data.Sqlite;
+using TShockAPI.DB;
 
 namespace Koishi
 {
 	[ApiVersion(2, 1)]
 	public class CDMain : TerrariaPlugin
 	{
-		private string configPath = "tshock\\CustomDifficulty.json";
+        public static IDbConnection DeathDropLog;
+        private string configPath = "tshock\\CustomDifficulty.json";
 		private Config config;
 		public override string Author => "Gyrodrill";
 		public override string Description => "Customize difficulty for SSC players, like random drop x items when killed.";
@@ -28,7 +33,46 @@ namespace Koishi
 		}
 		public override void Initialize()
 		{
-			ServerApi.Hooks.NetGetData.Register(this, NetHooks_GetData);
+            switch (TShock.Config.StorageType.ToLower())
+            {
+                case "mysql":
+                    string[] host = TShock.Config.MySqlHost.Split(':');
+                    DeathDropLog = new MySqlConnection()
+                    {
+                        ConnectionString = string.Format("Server={0}; Port={1}; Database={2}; Uid={3}; Pwd={4};",
+                            host[0],
+                            host.Length == 1 ? "3306" : host[1],
+                            TShock.Config.MySqlDbName,
+                            TShock.Config.MySqlUsername,
+                            TShock.Config.MySqlPassword)
+                    };
+                    break;
+                case "sqlite":
+                    string sql = Path.Combine(TShock.SavePath, "DeathLog.sqlite");
+                    DeathDropLog = new SqliteConnection(string.Format("uri=file://{0},Version=3", sql));
+                    break;
+            }
+            SqlTableCreator sqlcreator = new SqlTableCreator(DeathDropLog,
+                DeathDropLog.GetSqlType() == SqlType.Sqlite ? (IQueryBuilder)new SqliteQueryCreator() : new MysqlQueryCreator());
+            sqlcreator.EnsureTableStructure(new SqlTable("DeathDropLog",
+                new SqlColumn("Time", MySqlDbType.String, 200),
+                new SqlColumn("Dropper", MySqlDbType.VarChar) { Length = 100 },
+                new SqlColumn("ItemName", MySqlDbType.String, 70),
+                new SqlColumn("Prefix", MySqlDbType.String, 100),
+                new SqlColumn("Stack", MySqlDbType.String, 100),
+                new SqlColumn("WorldID", MySqlDbType.Int32),
+                new SqlColumn("LocationX", MySqlDbType.String, 20),
+                new SqlColumn("LocationY", MySqlDbType.String, 100)));
+
+            sqlcreator.EnsureTableStructure(new SqlTable("PlayerDeathLog",
+               new SqlColumn("Time", MySqlDbType.String, 200),
+               new SqlColumn("Account", MySqlDbType.VarChar) { Length = 100 },
+               new SqlColumn("WorldID", MySqlDbType.Int32),
+               new SqlColumn("Message", MySqlDbType.LongText),
+               new SqlColumn("LocationX", MySqlDbType.String, 100),
+               new SqlColumn("LocationY", MySqlDbType.String, 100)));
+
+            ServerApi.Hooks.NetGetData.Register(this, NetHooks_GetData);
 			ReadConfig(configPath, new Config(), ref config);
 			Commands.ChatCommands.Add(new Command("Koishi.CustomDifficulty.reload", CDReload, "cdr", "cdreload"));
 		}
@@ -83,7 +127,19 @@ namespace Koishi
 				args.Msg.reader.BaseStream.Position = args.Index;
 				int playerID = args.Msg.whoAmI;
 				var p = Main.player[playerID];
-				if (p.difficulty != 0 || !TShock.ServerSideCharacterConfig.Enabled)
+                string whyudie = "";
+                using (var reader = new BinaryReader(new MemoryStream(args.Msg.readBuffer, args.Index, args.Length)))
+                {
+
+                    byte victimid = reader.ReadByte();
+
+                    Terraria.DataStructures.PlayerDeathReason reason = Terraria.DataStructures.PlayerDeathReason.FromReader(reader);
+                    whyudie = Convert.ToString(reason.GetDeathText(p.name));
+                    
+                }
+
+                    var deathlogadd = DeathDropLog.Query("INSERT INTO PlayerDeathLog (Time, Account, WorldID, Message, LocationX, LocationY) VALUES (@0, @1, @2, @3, @4, @5);", DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss"), p.name, Main.worldID, whyudie, p.position.X / 16, p.position.Y / 16);
+                if (p.difficulty != 0 || !TShock.ServerSideCharacterConfig.Enabled)
 				{
 					return;
 				}
@@ -133,8 +189,13 @@ namespace Koishi
 			while (DropSeq.Any())
 			{
 				var d = pil.IndexOf(DropSeq[0]);
-				notice.Append(TShock.Utils.ItemTag(inv[d]));
-				DropItem(p, pil[d], os + d);
+				
+                if (pil[d].Name != "")
+                {
+                    notice.Append(TShock.Utils.ItemTag(pil[d]));
+                    var logadd = DeathDropLog.Query("INSERT INTO DeathDropLog (Time, Dropper, ItemName, Prefix, Stack, WorldID, LocationX, LocationY) VALUES (@0, @1, @2, @3, @4, @5, @6, @7);", DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss"), p.name, pil[d].Name, pil[d].prefix, pil[d].stack, Main.worldID, p.position.X/16, p.position.Y/16);
+                    DropItem(p, pil[d], os + d);
+                }
 				DropSeq.RemoveAt(0);
 			}
 		}
@@ -144,9 +205,13 @@ namespace Koishi
 			{
 				if (Main.rand.Next(100) < config.RandomDropRate)
 				{
-					notice.Append(TShock.Utils.ItemTag(inv[i]));
-					DropItem(p, inv[i], os + i);
-				}
+                    if (inv[i].Name != "")
+                    {
+                        notice.Append(TShock.Utils.ItemTag(inv[i]));
+                        var logadd = DeathDropLog.Query("INSERT INTO DeathDropLog (Time, Dropper, ItemName, Prefix, Stack, WorldID, LocationX, LocationY) VALUES (@0, @1, @2, @3, @4, @5, @6, @7);", DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss"), p.name, inv[i].Name, inv[i].prefix, inv[i].stack,Main.worldID, p.position.X/16, p.position.Y/16);
+                        DropItem(p, inv[i], os + i);
+                    }
+                }
 			}
 		}
 		public void DropItem(Player p, Item i, int itemID)
@@ -154,12 +219,13 @@ namespace Koishi
 			if (!config.Vanish)
 			{
 				var id = Item.NewItem(p.position, i.width, i.height, i.type, i.stack, true, i.prefix, true);
-				Main.item[id].owner = TShock.Utils.FindPlayer(p.name)[0].Index;
-			}
+                
+            }
 			i.stack = i.type = i.netID = 0;
 			i.active = false;
 			NetMessage.SendData(5, -1, -1, null, p.whoAmI, itemID, i.prefix);
-		}
+            
+        }
 		public static void ReadConfig<ConfigType>(string path, ConfigType defaultConfig, ref ConfigType config)
 		{
 			if (!File.Exists(path))
